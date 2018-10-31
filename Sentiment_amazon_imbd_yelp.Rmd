@@ -1,0 +1,525 @@
+---
+title: "Sentiment Analysis"
+output: word_document
+---
+```{r}
+#Step 1: Downloading the Data
+
+#Step 2: Exploring and preparing the data
+
+amazon_raw <- read.csv("amazon.csv", stringsAsFactors = FALSE)
+str(amazon_raw)
+
+```
+
+```{r}
+#Assigning Labels to factors
+
+amazon_raw$Type <- factor(amazon_raw$Type,
+                          levels = c(0,1),
+                          labels = c("Negative", "Positive"))
+
+table(amazon_raw$Type)
+```
+
+```{r}
+# build a corpus using the text mining (tm) package
+
+# Using the text mining package to handle the text data that is composed of a lot of words, spaces, punctuations and numbers. 
+
+library(tm)
+
+#The first step in processing text data involves creating a corpus, which is a collection of text documents. 
+#The documents can be short or long, from individual news articles, pages in a book or on the web, or entire books. 
+#In this case, the corpus will be a collection of Amazon reviews.
+
+amazon_corpus <- VCorpus(VectorSource(amazon_raw$Text))
+
+
+#Examine the review_corpus
+print(amazon_corpus)
+```
+
+```{r}
+#by printing the corpus we can see that it contains reviews for 1000 messages in the training data
+
+#to view the summary of the first and second review
+inspect(amazon_corpus[1:2])
+
+```
+
+```{r}
+#to view the actual message
+as.character(amazon_corpus[1])
+
+print(amazon_corpus[1])
+```
+
+```{r}
+#The tm_map() function provides a method to apply a transformation (also known as mapping) to a tm corpus.
+
+
+amazon_corpus_clean <- tm_map(amazon_corpus,
+                              content_transformer(tolower))
+
+as.character(amazon_corpus[1])
+as.character(amazon_corpus_clean[1])
+
+
+amazon_corpus_clean <- tm_map(amazon_corpus_clean,removeWords, stopwords())
+
+amazon_corpus_clean <- tm_map(amazon_corpus_clean,removePunctuation)
+replacePunctuation <- function(x) {
+  gsub("[[:punct:]]+", " ", x)
+}
+
+
+```
+
+```{r}
+#Stemming
+library(SnowballC)
+amazon_corpus_clean <- tm_map(amazon_corpus_clean, stemDocument)
+
+amazon_corpus_clean <- tm_map(amazon_corpus_clean, stripWhitespace)
+
+amazon_dtm <- DocumentTermMatrix(amazon_corpus_clean)
+amazon_dtm
+```
+
+```{r}
+amazon_dtm_train <- amazon_dtm[1:750,]
+amazon_dtm_test <- amazon_dtm[751:1000,]
+
+amazon_train_labels <- amazon_raw[1:750,]$Type
+amazon_test_labels <- amazon_raw[751:1000,]$Type
+
+prop.table(table(amazon_train_labels))
+prop.table(table(amazon_test_labels))
+```
+
+```{r}
+library(wordcloud)
+wordcloud(amazon_corpus_clean, min.freq = 10, random.order = FALSE)
+
+
+```
+
+```{r}
+findFreqTerms(amazon_dtm_train,5)
+amazon_freq_words <- findFreqTerms(amazon_dtm_train, 5)
+str(amazon_freq_words)
+```
+
+```{r}
+amazon_dtm_freq_train<- amazon_dtm_train[ , amazon_freq_words]
+amazon_dtm_freq_test <- amazon_dtm_test[ , amazon_freq_words]
+
+convert_counts <- function(x) {
+  x <- ifelse(x > 0, "Yes", "No")
+}
+
+# apply() convert_counts() to columns of train/test data
+
+# We now need to apply convert_counts() to each of the columns in our sparse matrix.
+
+amazon_train <- apply(amazon_dtm_freq_train, MARGIN = 2, convert_counts)
+amazon_test  <- apply(amazon_dtm_freq_test, MARGIN = 2, convert_counts)
+```
+
+```{r}
+#Step 3: Training a model on the data
+
+library(e1071)
+
+amazon_classifier <- naiveBayes(amazon_train, amazon_train_labels)
+```
+
+```{r}
+#Step 4: Evaluating model performance
+
+amazon_test_pred <- predict(amazon_classifier, amazon_test)
+
+head(amazon_test_pred)
+
+```
+
+```{r}
+library(gmodels)
+
+CrossTable(amazon_test_pred, amazon_test_labels,
+           prop.chisq = FALSE, prop.t = FALSE, prop.r = FALSE,
+           dnn = c('predicted', 'actual'))
+```
+
+```{r}
+# Step 5 Improving model performance
+
+amazon_classifier2 <- naiveBayes(amazon_train, amazon_train_labels, laplace = 3)
+amazon_test_pred2 <- predict(amazon_classifier2, amazon_test)
+CrossTable(amazon_test_pred2, amazon_test_labels,
+           prop.chisq = FALSE, prop.t = FALSE, prop.r = FALSE,
+           dnn = c('predicted', 'actual'))
+
+```
+
+```{r}
+###########PART 2 IMDB 
+
+
+#Step 1: Downloading the Data
+
+#Step 2: Exploring and preparing the data
+
+imdb_raw <- read.csv("imdb.csv", stringsAsFactors = FALSE)
+head(imdb_raw)
+
+str(imdb_raw)
+```
+
+```{r}
+#Assigning Labels to factors
+
+imdb_raw$Type <- factor(imdb_raw$Type,
+                        levels = c(0,1),
+                        labels = c("Negative", "Positive"))
+
+table(imdb_raw$Type)
+```
+
+```{r}
+
+# build a corpus using the text mining (tm) package
+
+# Using the text mining package to handle the text data that is composed of a lot of words, spaces, punctuations and numbers. 
+
+library(tm)
+
+#The first step in processing text data involves creating a corpus, which is a collection of text documents. 
+#The documents can be short or long, from individual news articles, pages in a book or on the web, or entire books. 
+#In this case, the corpus will be a collection of Amazon reviews.
+
+imdb_corpus <- VCorpus(VectorSource(imdb_raw$Text))
+
+
+#Examine the review_corpus
+print(imdb_corpus)
+```
+
+```{r}
+#by printing the corpus we can see that it contains reviews for 1000 messages in the training data
+
+#to view the summary of the first and second review
+inspect(imdb_corpus[1:2])
+
+```
+
+```{r}
+
+#to view the actual message
+as.character(imdb_corpus[1])
+
+print(imdb_corpus[1])
+```
+
+```{r}
+#The tm_map() function provides a method to apply a transformation (also known as mapping) to a tm corpus.
+
+
+imdb_corpus_clean <- tm_map(imdb_corpus,
+                            content_transformer(tolower))
+
+as.character(imdb_corpus[1])
+as.character(imdb_corpus_clean[1])
+
+
+imdb_corpus_clean <- tm_map(imdb_corpus_clean,removeWords, stopwords())
+
+imdb_corpus_clean <- tm_map(imdb_corpus_clean,removePunctuation)
+replacePunctuation <- function(x) {
+  gsub("[[:punct:]]+", " ", x)
+}
+
+
+```
+
+```{r}
+#Stemming
+library(SnowballC)
+imdb_corpus_clean <- tm_map(imdb_corpus_clean, stemDocument)
+
+imdb_corpus_clean <- tm_map(imdb_corpus_clean, stripWhitespace)
+```
+
+```{r}
+#Creating a Document term matrix
+
+imdb_dtm <- DocumentTermMatrix(imdb_corpus_clean)
+imdb_dtm
+
+imdb_dtm_train <- imdb_dtm[1:750,]
+imdb_dtm_test <- imdb_dtm[751:1000,]
+
+imdb_train_labels <- imdb_raw[1:750,]$Type
+imdb_test_labels <- imdb_raw[751:1000,]$Type
+
+prop.table(table(imdb_train_labels))
+prop.table(table(imdb_test_labels))
+
+```
+
+```{r}
+library(wordcloud)
+wordcloud(imdb_corpus_clean, min.freq = 10, random.order = FALSE)
+
+```
+
+```{r}
+findFreqTerms(imdb_dtm_train,5)
+imdb_freq_words <- findFreqTerms(imdb_dtm_train, 5)
+str(imdb_freq_words)
+```
+
+```{r}
+imdb_dtm_freq_train<- imdb_dtm_train[ , imdb_freq_words]
+imdb_dtm_freq_test <- imdb_dtm_test[ , imdb_freq_words]
+
+convert_counts <- function(x) {
+  x <- ifelse(x > 0, "Yes", "No")
+}
+
+# apply() convert_counts() to columns of train/test data
+
+# We now need to apply convert_counts() to each of the columns in our sparse matrix.
+
+imdb_train <- apply(imdb_dtm_freq_train, MARGIN = 2, convert_counts)
+imdb_test  <- apply(imdb_dtm_freq_test, MARGIN = 2, convert_counts)
+
+```
+
+```{r}
+#Step 3: Training a model on the data
+
+library(e1071)
+
+imdb_classifier <- naiveBayes(imdb_train, imdb_train_labels)
+
+```
+
+```{r}
+
+#Step 4: Evaluating model performance
+
+imdb_test_pred <- predict(imdb_classifier, imdb_test)
+
+head(imdb_test_pred)
+
+library(gmodels)
+
+CrossTable(imdb_test_pred, imdb_test_labels,
+           prop.chisq = FALSE, prop.t = FALSE, prop.r = FALSE,
+           dnn = c('predicted', 'actual'))
+```
+
+```{r}
+# Step 5 Improving model performance
+
+imdb_classifier2 <- naiveBayes(imdb_train, imdb_train_labels, laplace = 2)
+imdb_test_pred2 <- predict(imdb_classifier2, imdb_test)
+CrossTable(imdb_test_pred2, imdb_test_labels,
+           prop.chisq = FALSE, prop.t = FALSE, prop.r = FALSE,
+           dnn = c('predicted', 'actual'))
+```
+
+```{r}
+######PART 3: Yelp Data
+
+###########PART 2 YELP 
+
+
+#Step 1: Downloading the Data
+
+#Step 2: Exploring and preparing the data
+
+yelp_raw <- read.csv("yelp.csv", stringsAsFactors = FALSE)
+head(yelp_raw)
+
+str(yelp_raw)
+```
+
+
+```{r}
+#Assigning Labels to factors
+
+yelp_raw$Type <- factor(yelp_raw$Type,
+                        levels = c(0,1),
+                        labels = c("Negative", "Positive"))
+
+table(yelp_raw$Type)
+```
+
+```{r}
+# build a corpus using the text mining (tm) package
+
+# Using the text mining package to handle the text data that is composed of a lot of words, spaces, punctuations and numbers. 
+
+library(tm)
+
+#The first step in processing text data involves creating a corpus, which is a collection of text documents. 
+#The documents can be short or long, from individual news articles, pages in a book or on the web, or entire books. 
+#In this case, the corpus will be a collection of Amazon reviews.
+
+yelp_corpus <- VCorpus(VectorSource(yelp_raw$Text))
+
+
+#Examine the review_corpus
+print(yelp_corpus)
+```
+
+```{r}
+#by printing the corpus we can see that it contains reviews for 1000 messages in the training data
+
+#to view the summary of the first and second review
+inspect(yelp_corpus[1:2])
+
+#to view the actual message
+as.character(yelp_corpus[1])
+
+print(yelp_corpus[1])
+
+```
+
+```{r}
+#The tm_map() function provides a method to apply a transformation (also known as mapping) to a tm corpus.
+
+
+yelp_corpus_clean <- tm_map(yelp_corpus,
+                            content_transformer(tolower))
+
+as.character(yelp_corpus[1])
+as.character(yelp_corpus_clean[1])
+
+
+yelp_corpus_clean <- tm_map(yelp_corpus_clean,removeWords, stopwords())
+
+yelp_corpus_clean <- tm_map(yelp_corpus_clean,removePunctuation)
+replacePunctuation <- function(x) {
+  gsub("[[:punct:]]+", " ", x)
+}
+
+
+
+```
+
+```{r}
+#Stemming
+library(SnowballC)
+yelp_corpus_clean <- tm_map(yelp_corpus_clean, stemDocument)
+
+yelp_corpus_clean <- tm_map(yelp_corpus_clean, stripWhitespace)
+
+
+```
+
+```{r}
+#Creating a Document term matrix
+
+yelp_dtm <- DocumentTermMatrix(yelp_corpus_clean)
+yelp_dtm
+
+yelp_dtm_train <- yelp_dtm[1:750,]
+yelp_dtm_test <- yelp_dtm[751:1000,]
+
+yelp_train_labels <- yelp_raw[1:750,]$Type
+yelp_test_labels <- yelp_raw[751:1000,]$Type
+
+prop.table(table(yelp_train_labels))
+prop.table(table(yelp_test_labels))
+```
+
+```{r}
+library(wordcloud)
+wordcloud(yelp_corpus_clean, min.freq = 10, random.order = FALSE)
+
+```
+
+```{r}
+findFreqTerms(yelp_dtm_train,5)
+yelp_freq_words <- findFreqTerms(yelp_dtm_train, 5)
+str(yelp_freq_words)
+```
+
+```{r}
+yelp_dtm_freq_train<- yelp_dtm_train[ , yelp_freq_words]
+yelp_dtm_freq_test <- yelp_dtm_test[ , yelp_freq_words]
+
+convert_counts <- function(x) {
+  x <- ifelse(x > 0, "Yes", "No")
+}
+
+# apply() convert_counts() to columns of train/test data
+
+# We now need to apply convert_counts() to each of the columns in our sparse matrix.
+
+yelp_train <- apply(yelp_dtm_freq_train, MARGIN = 2, convert_counts)
+yelp_test  <- apply(yelp_dtm_freq_test, MARGIN = 2, convert_counts)
+
+```
+
+```{r}
+#Step 3: Training a model on the data
+
+library(e1071)
+
+yelp_classifier <- naiveBayes(yelp_train, yelp_train_labels)
+```
+
+```{r}
+#Step 4: Evaluating model performance
+
+yelp_test_pred <- predict(yelp_classifier, yelp_test)
+
+head(yelp_test_pred)
+
+library(gmodels)
+
+CrossTable(yelp_test_pred, yelp_test_labels,
+           prop.chisq = FALSE, prop.t = FALSE, prop.r = FALSE,
+           dnn = c('predicted', 'actual'))
+```
+
+```{r}
+# Step 5 Improving model performance
+
+yelp_classifier2 <- naiveBayes(yelp_train, yelp_train_labels, laplace = 2)
+yelp_test_pred2 <- predict(yelp_classifier2, yelp_test)
+CrossTable(yelp_test_pred2, yelp_test_labels,
+           prop.chisq = FALSE, prop.t = FALSE, prop.r = FALSE,
+           dnn = c('predicted', 'actual'))
+
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
